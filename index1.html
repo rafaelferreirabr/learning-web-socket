@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Web Socket</title>
+    <style>
+      #listaBases {
+        list-style-type: none;
+        width: 100%;
+      }
+      li {
+        float: left;
+        padding: 5px;
+      }
+      a {
+        padding: 5px;
+      }
+      .container {
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <p id="ws">aguardando</p>
+    <ul id="listaBases"></ul>
+    <select name="bases" id="bases">
+      <option value="">Escolha sua base</option>
+    </select>
+    <div class="container">
+      <ul id="listaSarcs"></ul>
+    </div>
+  </body>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-polyfill/6.26.0/polyfill.min.js"></script>
+  <script src="https://unpkg.com/@adonisjs/websocket-client@1.0.9/dist/Ws.browser.js"></script>
+  <script>
+    const state = {
+      bases: [],
+    };
+
+    let ws = adonis.Ws("ws://localhost:3333").connect();
+    const status = document.querySelector("#ws");
+
+    ws.on("open", (socket) => {
+      status.innerText = `connected with id: ${socket.connId}`;
+    });
+    ws.on("close", () => {
+      status.innerText = "disconnected";
+    });
+
+    const url = "http://localhost:3333/bases";
+
+    const bases = document.querySelector("#bases");
+
+    fetch(url).then((response) => {
+      response.json().then(function (data) {
+        data.map((base) => {
+          const option = document.createElement("option");
+          option.value = base.id;
+          option.innerText = base.name;
+          bases.appendChild(option);
+        });
+      });
+    });
+
+    const listaBases = document.querySelector("#listaBases");
+
+    bases.addEventListener("change", (e) => {
+      e.preventDefault();
+      if (!state.bases.includes(e.target.value)) {
+        state.bases.push(e.target.value);
+        renderUl(e.target.value);
+        const sarc = ws.subscribe(`sarcs:${e.target.value}`);
+        if (sarc) {
+          sarc.on("ready", () => {
+            sarc.emit("message", e.target.value);
+          });
+
+          sarc.on("error", (error) => {
+            console.log(error);
+          });
+          sarc.on("newSarc", (data) => {
+            const listaSarcs = document.querySelector("#listaSarcs");
+            const li = document.createElement("li");
+            li.innerHTML = `<b>motivation:</b> ${data.motivation}
+                      <b>type:</b> ${data.type}
+                      <b>base:</b> ${data.base}
+                    <b>Protocolo:</b> ${data.id}`;
+            listaSarcs.appendChild(li);
+          });
+
+          sarc.on("close", () => {});
+        }
+      }
+    });
+
+    function renderUl(base) {
+      const listItem = document.createElement("li");
+      const excluir = document.createElement("a");
+      excluir.setAttribute("href", "#");
+      excluir.setAttribute("id", `excluir${base}`);
+      excluir.setAttribute("data-value", base);
+      excluir.innerText = "X";
+      listItem.innerText = base;
+      listItem.appendChild(excluir);
+      listaBases.appendChild(listItem);
+
+      const linkExcluir = document.querySelector(`#excluir${base}`);
+      linkExcluir.addEventListener("click", (event) => {
+        event.preventDefault();
+        if (state.bases.includes(base)) {
+          const index = state.bases.indexOf(base);
+          if (index > -1) {
+            state.bases.splice(index, 1);
+            event.target.parentElement.remove();
+            ws.getSubscription(`sarcs:${base}`).close();
+          }
+        }
+      });
+    }
+  </script>
+</html>

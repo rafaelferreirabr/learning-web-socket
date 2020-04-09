@@ -1,11 +1,11 @@
 const state = {
-  bases: [],
+  bases: []
 };
 
 let ws = adonis.Ws("ws://localhost:3333").connect();
 const status = document.querySelector("#ws");
 
-ws.on("open", (socket) => {
+ws.on("open", socket => {
   status.innerText = `connected`;
 });
 ws.on("close", () => {
@@ -16,9 +16,10 @@ const url = "http://localhost:3333/bases";
 
 const basesSelect = document.querySelector("#bases");
 
-fetch(url).then((response) => {
-  response.json().then(function (data) {
-    data.map((responseBase) => {
+fetch(url).then(response => {
+  response.json().then(function(data) {
+    state.baseList = data;
+    data.map(responseBase => {
       console.log(responseBase);
       const option = document.createElement("option");
       option.value = responseBase.id;
@@ -28,58 +29,75 @@ fetch(url).then((response) => {
   });
 });
 
-const listaBases = document.querySelector("#listaBases");
-
-bases.addEventListener("change", (e) => {
+bases.addEventListener("change", e => {
   e.preventDefault();
-  if (!state.bases.includes(e.target.value)) {
-    state.bases.push(e.target.value);
-    renderUl(e.target.value);
-    const sarc = ws.subscribe(`sarcs:${e.target.value}`);
-    if (sarc) {
-      sarc.on("ready", () => {
-        sarc.emit("message", e.target.value);
-      });
-
-      sarc.on("error", (error) => {
-        console.log(error);
-      });
-      sarc.on("newSarc", (data) => {
-        const listaSarcs = document.querySelector("#listaSarcs");
-        const li = document.createElement("li");
-        li.innerHTML = `<b>motivation:</b> ${data.motivation}
-                    <b>type:</b> ${data.type}
-                    <b>base:</b> ${data.base}
-                  <b>Protocolo:</b> ${data.id}`;
-        listaSarcs.appendChild(li);
-      });
-
-      sarc.on("close", () => {});
-    }
+  const baseId = e.target.value;
+  if (!state.bases.includes(baseId)) {
+    state.bases.push(baseId);
+    renderButtonAssigned(baseId);
+    subscribeTopic(baseId);
   }
 });
 
-function renderUl(base) {
-  const listItem = document.createElement("li");
-  const excluir = document.createElement("a");
-  excluir.setAttribute("href", "#");
-  excluir.setAttribute("id", `excluir${base}`);
-  excluir.setAttribute("data-value", base);
-  excluir.innerText = "X";
-  listItem.innerText = base;
-  listItem.appendChild(excluir);
-  listaBases.appendChild(listItem);
+function renderButtonAssigned(baseId) {
+  const listaBasesAssinadas = document.querySelector("#listaBasesAssinadas");
+  const buttonAssigned = createButtonAssingned(baseId);
+  createEventDeleteButton(buttonAssigned);
+  listaBasesAssinadas.appendChild(buttonAssigned);
+}
 
-  const linkExcluir = document.querySelector(`#excluir${base}`);
-  linkExcluir.addEventListener("click", (event) => {
+function renderSarcs(arraySarcs) {
+  arraySarcs.map(sarc => {
+    const listaSarcs = document.querySelector("#listaSarcs");
+    const linhaSarc = document.createElement("tr");
+    linhaSarc.innerHTML = `<th scope="row">${sarc.id}</th>
+        <td>${sarc.type}</td>
+        <td>${sarc.base}</td>
+        <td>${sarc.created_at}</td>`;
+    listaSarcs.appendChild(linhaSarc);
+  });
+}
+
+function createButtonAssingned(baseId) {
+  const button = document.createElement("a");
+  button.setAttribute("href", "#");
+  button.setAttribute("id", `${baseId}`);
+  button.setAttribute("class", "btn btn-sm btn-outline-danger");
+  button.innerText = state.baseList[baseId - 1].name;
+  return button;
+}
+
+function createEventDeleteButton(buttonAssigned) {
+  const baseId = buttonAssigned.getAttribute("id");
+  buttonAssigned.addEventListener("click", event => {
     event.preventDefault();
-    if (state.bases.includes(base)) {
-      const index = state.bases.indexOf(base);
+    if (state.bases.includes(baseId)) {
+      const index = state.bases.indexOf(baseId);
       if (index > -1) {
         state.bases.splice(index, 1);
-        event.target.parentElement.remove();
-        ws.getSubscription(`sarcs:${base}`).close();
+        event.target.remove();
+        ws.getSubscription(`sarcs:${baseId}`).close();
       }
     }
   });
+}
+
+function subscribeTopic(baseId) {
+  const sarc = ws.subscribe(`sarcs:${baseId}`);
+  if (sarc) {
+    sarc.on("ready", () => {
+      sarc.emit("message", baseId);
+    });
+
+    sarc.on("error", error => {
+      console.log(error);
+    });
+    sarc.on("newSarc", newSarc => {
+      renderSarcs([newSarc]);
+    });
+
+    sarc.on("close", socket => {
+      console.log(`Conexao fechada com o topico ${socket.topic}`);
+    });
+  }
 }

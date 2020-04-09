@@ -50,12 +50,50 @@ function renderSarcs(arraySarcs) {
   arraySarcs.map(sarc => {
     const listaSarcs = document.querySelector("#listaSarcs");
     const linhaSarc = document.createElement("tr");
+    linhaSarc.setAttribute("id", `sarcLineId${sarc.id}`);
     linhaSarc.innerHTML = `<th scope="row">${sarc.id}</th>
         <td>${sarc.type}</td>
         <td>${sarc.base}</td>
-        <td>${sarc.created_at}</td>`;
-    listaSarcs.appendChild(linhaSarc);
+        <td>${sarc.status}</td>
+        <td>${sarc.created_at}</td>
+  <td>${buttonUpdateStatus(sarc)}</td>`;
+    listaSarcs.prepend(linhaSarc);
   });
+}
+
+function buttonUpdateStatus(sarc) {
+  if (sarc.status === "waiting") {
+    return `<a href ="#" class="btn btn-success" onclick=updateSarcStatus(${sarc.id})>Pegar</a>`;
+  }
+  return `<a href ="#" class="btn btn-warning" onclick=updateSarcStatus(${sarc.id})>Encerrar</a>`;
+}
+
+function updateSarcStatus(sarcId) {
+  var myHeaders = new Headers({
+    "Content-Type": "application/json",
+    Authorization:
+      "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjEsImlhdCI6MTU4NjQ1MjkxMX0.WB1PmrTwn1JqsVPP830zzHfSMpVrMer-qN1ITjSU3y8"
+  });
+  const url = `http://localhost:3333/sarcs/${sarcId} `;
+  const data = JSON.stringify({ status: "processing" });
+  fetch(url, {
+    method: "PUT",
+    body: data,
+    headers: myHeaders
+  })
+    .then(response => {
+      response.json().then(function(data) {
+        sendToAllProcessing(data);
+      });
+    })
+    .catch(e => console.log(e));
+}
+
+function sendToAllProcessing(sarc) {
+  const topic = ws.getSubscription(`sarcs:${sarc.base_id}`);
+  if (topic) {
+    topic.emit("update", sarc);
+  }
 }
 
 function createButtonAssingned(baseId) {
@@ -103,9 +141,20 @@ function subscribeTopic(baseId) {
     sarc.on("assigned", sarcs => {
       renderSarcs(sarcs);
     });
+    sarc.on("update", sarc => {
+      renderSarcUpdated(sarc);
+    });
 
     sarc.on("close", socket => {
       console.log(`Conexao fechada com o topico ${socket.topic}`);
     });
   }
+}
+
+function renderSarcUpdated(sarc) {
+  const sarcLine = document.querySelector(`#sarcLineId${sarc.id}`);
+  console.log(sarcLine);
+  console.log(`#sarcLineId${sarc.id}`);
+  sarcLine.remove();
+  renderSarcs([sarc]);
 }

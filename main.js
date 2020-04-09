@@ -87,6 +87,8 @@ function subscribeTopic(baseId) {
   if (sarc) {
     sarc.on("ready", () => {
       sarc.emit("message", baseId);
+      sarc.emit("connect", baseId);
+      console.log("aberto");
     });
 
     sarc.on("error", error => {
@@ -94,6 +96,12 @@ function subscribeTopic(baseId) {
     });
     sarc.on("newSarc", newSarc => {
       renderSarcs([newSarc]);
+    });
+    sarc.on("openSarcs", sarcs => {
+      renderSarcs(sarcs);
+    });
+    sarc.on("assigned", sarcs => {
+      renderSarcs(sarcs);
     });
 
     sarc.on("close", socket => {
